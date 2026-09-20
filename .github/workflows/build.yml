@@ -1,0 +1,75 @@
+name: OpenWrt x86_64 UEFI Builder
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libncurses5-dev git-core unzip \
+            zlib1g-dev gawk libssl-dev xxd
+
+      - name: Download ImageBuilder
+        run: |
+          cd /tmp
+          wget -q https://downloads.openwrt.org/releases/23.05.4/targets/x86/64/openwrt-imagebuilder-23.05.4-x86-64.Linux-x86_64.tar.xz
+          tar -xf openwrt-imagebuilder-23.05.4-x86-64.Linux-x86_64.tar.xz
+
+      - name: Configure ImageBuilder
+        run: |
+          cd /tmp/openwrt-imagebuilder-23.05.4-x86-64.Linux-x86_64
+          # Ensure package repo is configured
+          echo "src/gz openwrt_packages https://downloads.openwrt.org/releases/23.05.4/packages/x86_64/packages" >> repositories.conf
+          echo "src/gz openwrt_base https://downloads.openwrt.org/releases/23.05.4/packages/x86_64/base" >> repositories.conf
+          echo "src/gz openwrt_luci https://downloads.openwrt.org/releases/23.05.4/packages/x86_64/luci" >> repositories.conf
+          echo "src/gz openwrt_routing https://downloads.openwrt.org/releases/23.05.4/packages/x86_64/routing" >> repositories.conf
+          echo "src/gz openwrt_telephony https://downloads.openwrt.org/releases/23.05.4/packages/x86_64/telephony" >> repositories.conf
+
+      - name: Build OpenWrt image
+        run: |
+          cd /tmp/openwrt-imagebuilder-23.05.4-x86-64.Linux-x86_64
+          
+          PACKAGES="kmod-ath11k kmod-ath10k-ct kmod-iwlwifi \
+            kmod-mt7915e kmod-mt7921e kmod-mt7921u \
+            kmod-brcmfmac kmod-rtl8821ae kmod-rtl8192ee \
+            kmod-usb-wwan kmod-usb-net-qmi-wwan kmod-usb-net-cdc-mbim \
+            kmod-usb-net-cdc-ncm kmod-usb-serial-option kmod-usb-serial-wwan \
+            kmod-usb-core kmod-usb2 kmod-usb3 kmod-usb-net kmod-usb-xhci-hcd \
+            qmi-utils uqmi modemmanager comgt luci luci-app-mwan3 \
+            luci-app-wireguard luci-app-sqm luci-app-nlbwmon luci-app-opkg"
+
+          make image PROFILE=generic PACKAGES="$PACKAGES" V=s 2>&1 | tail -50
+
+      - name: Verify output
+        run: |
+          cd /tmp/openwrt-imagebuilder-23.05.4-x86-64.Linux-x86_64
+          echo "=== Output images ==="
+          ls -la bin/targets/x86/64/*.img* 2>/dev/null || echo "No images found"
+          ls -la bin/targets/x86/64/*.ext4* 2>/dev/null || echo "No ext4 images"
+          ls -la bin/targets/x86/64/*.iso* 2>/dev/null || echo "No ISO images"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: openwrt-x86-64-images
+          path: /tmp/openwrt-imagebuilder-23.05.4-x86-64.Linux-x86_64/bin/targets/x86/64/
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: /tmp/openwrt-imagebuilder-23.05.4-x86-64.Linux-x86_64/bin/targets/x86/64/*
+          name: OpenWrt x86_64 - Modem + WiFi Support
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
