@@ -1,9 +1,9 @@
-name: OpenWrt x86_64 UEFI
+name: Build OpenWrt 25.12
 
 on:
   push:
     branches: [ master ]
-    tags: [ 'v*' ]
+  tags: [ 'v*' ]
   workflow_dispatch:
 
 jobs:
@@ -13,76 +13,71 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install build deps
+      - name: Install deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential libncurses5-dev git-core unzip zlib1g-dev gawk libssl-dev
+          sudo apt-get install -y make binutils findutils gawk unzip wget zstd
 
       - name: Download ImageBuilder
         run: |
           cd /tmp
-          wget -q https://downloads.openwrt.org/releases/23.05.4/targets/x86/64/openwrt-imagebuilder-23.05.4-x86-64.Linux-x86_64.tar.xz
-          tar -xf openwrt-imagebuilder-23.05.4-x86-64.Linux-x86_64.tar.xz
+          wget -q "https://dl.openwrt.ai/releases/25.12/targets/x86/64/kwrt-imagebuilder-x86-64.Linux-x86_64.tar.zst"
+          tar --zstd -xf kwrt-imagebuilder-x86-64.Linux-x86_64.tar.zst
 
-      - name: Configure hostname
+      - name: Configure feeds + hostname
         run: |
-          cd /tmp/openwrt-imagebuilder-23.05.4-x86-64.Linux-x86_64
-          # Add hostname to image config
+          cd /tmp/kwrt-imagebuilder-x86-64.Linux-x86_64
+          
+          # Add Kiddin9 community feed (has passwall, openclash, filebrowser)
+          echo 'src/gz kiddin9 https://dl.openwrt.ai/releases/25.12/packages/x86_64/kiddin9' >> repositories.conf
+          
+          # Set hostname
           echo 'CONFIG_HOST_NAME="Masta-GOHIM"' >> .config
 
-      - name: Build OpenWrt image
+      - name: Build image
         run: |
-          cd /tmp/openwrt-imagebuilder-23.05.4-x86-64.Linux-x86_64
-
+          cd /tmp/kwrt-imagebuilder-x86-64.Linux-x86_64
+          
           PACKAGES="ttyd luci luci-app-mwan3 luci-app-wireguard luci-app-openvpn \
-            luci-app-sqm luci-app-nlbwmon luci-app-opkg luci-app-statistics luci-mod-status \
-            luci-theme-bootstrap luci-proto-ncm luci-proto-qmi \
-            kmod-ath11k kmod-iwlwifi kmod-mt7915e kmod-mt7921e kmod-brcmfmac \
-            kmod-usb-net-qmi-wwan kmod-usb-net-cdc-mbim kmod-usb-net-cdc-ncm \
-            kmod-usb-serial-option kmod-usb-serial-wwan modemmanager qmi-utils uqmi \
-            luci-app-commands kmod-sched-core kmod-ipt-nat-extra"
+            luci-app-sqm luci-app-nlbwmon luci-app-opkg luci-app-commands \
+            luci-app-ttyd luci-theme-bootstrap luci-mod-admin-full \
+            modemmanager qmi-utils uqmi usbutils usb-modeswitch \
+            luci-app-passwall luci-app-openclash luci-app-filebrowser-go \
+            luci-proto-ncm luci-proto-qmi"
 
-          echo "Building with packages: $PACKAGES"
-          make image PROFILE=generic PACKAGES="$PACKAGES" V=s 2>&1 | tail -80
+          make image PROFILE=generic PACKAGES="$PACKAGES" 2>&1 | tail -30
 
-      - name: Verify output
+      - name: Verify
         run: |
-          cd /tmp/openwrt-imagebuilder-23.05.4-x86-64.Linux-x86_64
-          ls -la bin/targets/x86/64/
+          cd /tmp/kwrt-imagebuilder-x86-64.Linux-x86_64
+          ls -la bin/targets/x86/64/generic*/ | grep -E '\.(img|gz|manifest)'
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: openwrt-image
-          path: /tmp/openwrt-imagebuilder-23.05.4-x86-64.Linux-x86_64/bin/targets/x86/64/
+          name: openwrt-masta-gohim
+          path: /tmp/kwrt-imagebuilder-x86-64.Linux-x86_64/bin/targets/x86/64/generic*/
 
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: /tmp/openwrt-imagebuilder-23.05.4-x86-64.Linux-x86_64/bin/targets/x86/64/*
-          name: OpenWrt x86_64 - Masta GOHIM Edition
+          files: /tmp/kwrt-imagebuilder-x86-64.Linux-x86_64/bin/targets/x86/64/generic*/*
+          name: OpenWrt 25.12 - Masta GOHIM Edition
           body: |
-            ## 🏷️ Hostname: **Masta-GOHIM**
+            ## 🏷️ Hostname: Masta-GOHIM
             
-            ### 📦 Built-in Tools
-            - ✅ ttyd - Web terminal
-            - ✅ modemmanager, qmi-utils, uqmi - 4G/5G modem support
-            - ✅ WiFi drivers: ath11k, iwlwifi, mt79xx
-            - ✅ LuCI: mwan3, wireguard, openvpn, sqm, nlbwmon
-            - ✅ luci-app-commands - CLI tools in web UI
+            ### 📦 Built-in Tools (25.12)
+            - ✅ ttyd + luci-app-ttyd - Web terminal
+            - ✅ passwall + openclash - Proxy tools
+            - ✅ filebrowser-go - Web file manager
+            - ✅ mwan3, wireguard, openvpn - Network tools
+            - ✅ modemmanager, qmi-utils - 4G/5G modem
             
-            ### 📥 Post-install: Install Passwall + OpenClash
+            ### 📥 WiFi Drivers: Install after flash
             ```bash
-            # Add passwall feed
-            echo "src/gz passwall http://op.supes.fun/packages" >> /etc/opkg/customfeeds.conf
             opkg update
-            opkg install luci-app-passwall
-            
-            # Add openclash feed  
-            echo "src/gz openclash https://github.com/vergesZhu/packages/releases/download/v1.0/oci86" >> /etc/opkg/customfeeds.conf
-            opkg update
-            opkg install luci-app-openclash
+            opkg install kmod-iwlwifi kmod-ath11k-pci kmod-mt7921e kmod-rtl8xxxu
             ```
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            
+            Build date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
