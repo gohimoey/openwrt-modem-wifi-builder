@@ -24,11 +24,16 @@ jobs:
           wget -q https://downloads.openwrt.org/releases/23.05.4/targets/x86/64/openwrt-imagebuilder-23.05.4-x86-64.Linux-x86_64.tar.xz
           tar -xf openwrt-imagebuilder-23.05.4-x86-64.Linux-x86_64.tar.xz
 
+      - name: Configure hostname
+        run: |
+          cd /tmp/openwrt-imagebuilder-23.05.4-x86-64.Linux-x86_64
+          # Add hostname to image config
+          echo 'CONFIG_HOST_NAME="Masta-GOHIM"' >> .config
+
       - name: Build OpenWrt image
         run: |
           cd /tmp/openwrt-imagebuilder-23.05.4-x86-64.Linux-x86_64
 
-          # Packages: ttyd + WiFi Modem + Tools + hostname
           PACKAGES="ttyd luci luci-app-mwan3 luci-app-wireguard luci-app-openvpn \
             luci-app-sqm luci-app-nlbwmon luci-app-opkg luci-app-statistics luci-mod-status \
             luci-theme-bootstrap luci-proto-ncm luci-proto-qmi \
@@ -37,17 +42,8 @@ jobs:
             kmod-usb-serial-option kmod-usb-serial-wwan modemmanager qmi-utils uqmi \
             luci-app-commands kmod-sched-core kmod-ipt-nat-extra"
 
-          make image PROFILE=generic PACKAGES="$PACKAGES" V=s 2>&1 | tail -50
-
-      - name: Set hostname
-        run: |
-          cd /tmp/openwrt-imagebuilder-23.05.4-x86-64.Linux-x86_64
-          # Add hostname to profile
-          echo 'CONFIG_HOST_NAME="Masta-GOHIM"' >> .config
-          # Or embed in image via root filesystem
-          mkdir -p staging_dir/target-x86_64/root/etc
-          echo "Masta-GOHIM" > staging_dir/target-x86_64/root/etc/hostname
-          echo "127.0.0.1 localhost Masta-GOHIM" > staging_dir/target-x86_64/root/etc/hosts
+          echo "Building with packages: $PACKAGES"
+          make image PROFILE=generic PACKAGES="$PACKAGES" V=s 2>&1 | tail -80
 
       - name: Verify output
         run: |
