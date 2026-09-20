@@ -24,7 +24,7 @@ jobs:
           wget -q "https://dl.openwrt.ai/releases/25.12/targets/x86/64/kwrt-imagebuilder-x86-64.Linux-x86_64.tar.zst"
           tar --zstd -xf kwrt-imagebuilder-x86-64.Linux-x86_64.tar.zst
 
-      - name: Configure
+      - name: Configure hostname + feeds
         run: |
           cd /tmp/kwrt-imagebuilder-x86-64.Linux-x86_64
           echo 'CONFIG_HOST_NAME="Masta-GOHIM"' >> .config
@@ -37,19 +37,47 @@ jobs:
             luci-app-nlbwmon luci-app-opkg luci-app-ttyd \
             modemmanager qmi-utils usbutils usb-modeswitch \
             luci-app-passwall luci-app-openclash luci-app-filebrowser-go luci-proto-ncm"
-          make image PROFILE=generic PACKAGES="$PACKAGES" 2>&1 | tail -50
+          make image PROFILE=generic PACKAGES="$PACKAGES" 2>&1 | tail -30
 
-      - name: Verify output
+      - name: Copy outputs
         run: |
           cd /tmp/kwrt-imagebuilder-x86-64.Linux-x86_64
-          echo "=== Output files ==="
-          find bin -type f | head -30
-          
-      - name: Upload artifacts
+          mkdir -p /tmp/output
+          cp bin/targets/x86/64/generic*/openwrt-*.img.gz /tmp/output/ 2>/dev/null || cp bin/targets/x86/64/openwrt-*.img.gz /tmp/output/ 2>/dev/null || true
+          cp bin/targets/x86/64/generic*/*.manifest /tmp/output/ 2>/dev/null || true
+          ls -laR bin/targets/x86/64/ | head -30
+          ls -la /tmp/output/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: masta-gohim-25.12
+          name: OpenWrt 25.12 - Masta GOHIM All-in-One
+          body: |
+            ## Hostname: Masta-GOHIM
+
+            ### ✅ Built-in Tools
+            - ttyd (web terminal via luci-app-ttyd)
+            - luci-app-passwall (proxy)
+            - luci-app-openclash (proxy)
+            - luci-app-filebrowser-go (file manager)
+            - mwan3, wireguard, openvpn, sqm, nlbwmon
+            - modemmanager, qmi-utils (4G/5G modem)
+            - WiFi drivers compiled-in
+
+            ### 🚀 Flash
+            Download .img.gz, gunzip, dd to USB.
+            
+            Access LuCI at 192.168.1.1
+          draft: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+      - name: Upload artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: openwrt-masta-gohim-v5
-          path: |
-            /tmp/kwrt-imagebuilder-x86-64.Linux-x86_64/bin/
-            /tmp/kwrt-imagebuilder-x86-64.Linux-x86_64/bin/targets/x86/64/
-          retention-days: 30
+          name: openwrt-masta-gohim
+          path: /tmp/output/
+          retention-days: 7
