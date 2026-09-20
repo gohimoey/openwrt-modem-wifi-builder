@@ -1,9 +1,11 @@
-name: Build OpenWrt x86_64 UEFI Builder
+name: Build OpenWrt x86_64
 
 on:
   push:
-    branches: [ master ]
-  tags: [ 'v*' ]
+    branches:
+      - master
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 jobs:
@@ -16,8 +18,7 @@ jobs:
       - name: Install build deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential libncurses-dev git-core unzip \
-            zlib1g-dev gawk libssl-dev
+          sudo apt-get install -y build-essential libncurses5-dev git-core unzip zlib1g-dev gawk libssl-dev
 
       - name: Download ImageBuilder
         run: |
@@ -29,45 +30,27 @@ jobs:
         run: |
           cd /tmp/openwrt-imagebuilder-23.05.4-x86-64.Linux-x86_64
 
-          # Packages - verified available for x86_64:
-          # WiFi drivers
-          PACKAGES="kmod-ath11k kmod-ath10k-ct kmod-iwlwifi \
-            kmod-mt7915e kmod-mt7921e kmod-mt7921u \
-            kmod-brcmfmac kmod-rtl8xxxu \
-            # Modem/4G/5G drivers
-            kmod-usb-net-qmi-wwan kmod-usb-net-cdc-mbim \
-            kmod-usb-net-cdc-ncm kmod-usb-net-huawei-cdc-ncm \
-            kmod-usb-net-sierrawireless kmod-usb-serial-option \
-            kmod-usb-serial-wwan kmod-mhi-wwan-ctrl \
-            # Core USB + serial
-            kmod-usb-core kmod-usb2 kmod-usb3 kmod-usb-net kmod-usb-xhci-hcd \
-            # Modem tools
-            qmi-utils uqmi modemmanager comgt luci \
-            # Network tools
-            luci-app-mwan3 luci-app-wireguard luci-app-openvpn \
-            luci-app-sqm luci-app-nlbwmon luci-app-opkg"
+          PACKAGES="kmod-ath11k kmod-ath10k-ct kmod-iwlwifi kmod-mt7915e kmod-mt7921e kmod-mt7921u kmod-brcmfmac kmod-rtl8xxxu kmod-usb-net-qmi-wwan kmod-usb-net-cdc-mbim kmod-usb-net-cdc-ncm kmod-usb-net-huawei-cdc-ncm kmod-usb-net-sierrawireless kmod-usb-serial-option kmod-usb-serial-wwan kmod-mhi-wwan-ctrl kmod-usb-core kmod-usb2 kmod-usb3 kmod-usb-net kmod-usb-xhci-hcd qmi-utils uqmi modemmanager luci luci-app-mwan3 luci-app-wireguard luci-app-openvpn luci-app-sqm luci-app-nlbwmon luci-app-opkg"
 
-          echo "🔨 Building OpenWrt x86_64 with modem+WiFi packages..."
-          make image PROFILE=generic PACKAGES="$PACKAGES" V=s 2>&1 | tail -80
+          make image PROFILE=generic PACKAGES="$PACKAGES" V=s 2>&1 | tail -60
 
       - name: Verify output
         run: |
           cd /tmp/openwrt-imagebuilder-23.05.4-x86-64.Linux-x86_64
           echo "=== Output images ==="
-          ls -la bin/targets/x86/64/ 2>/dev/null || echo "No images"
+          ls -la bin/targets/x86/64/ 2>/dev/null || echo "No images found"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: openwrt-x86-64-images
+          name: openwrt-image
           path: /tmp/openwrt-imagebuilder-23.05.4-x86-64.Linux-x86_64/bin/targets/x86/64/
 
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v4
         with:
-          files: /tmp/openwrt-imagebuilder-23.05.4-x86-64.Linux-x86_64/bin/targets/x86/64/*
-          name: OpenWrt x86_64 - Modem + WiFi Builder
-          generate_release_notes: true
+          files: /tmp/openwrt-imagebuilder-23.05.4-x86-64.Linux-x86-64/bin/targets/x86/64/*
+          name: OpenWrt x86_64 - Modem WiFi Support
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
