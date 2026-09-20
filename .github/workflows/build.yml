@@ -1,9 +1,8 @@
-name: Build OpenWrt 25.12 All-in-One
+name: Build OpenWrt 25.12 Masta GOHIM
 
 on:
   push:
-    branches: [ master ]
-  tags: [ 'v*' ]
+    branches: [master]
   workflow_dispatch:
 
 jobs:
@@ -13,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install deps
+      - name: Install build deps
         run: |
           sudo apt-get update
           sudo apt-get install -y make binutils findutils gawk unzip wget zstd
@@ -24,63 +23,56 @@ jobs:
           wget -q "https://dl.openwrt.ai/releases/25.12/targets/x86/64/kwrt-imagebuilder-x86-64.Linux-x86_64.tar.zst"
           tar --zstd -xf kwrt-imagebuilder-x86-64.Linux-x86_64.tar.zst
 
-      - name: Configure feeds + hostname
+      - name: Configure hostname and feeds
         run: |
           cd /tmp/kwrt-imagebuilder-x86-64.Linux-x86_64
-          
-          # Add Kiddin9 community feed
-          echo 'src/gz kiddin9 https://dl.openwrt.ai/releases/25.12/packages/x86_64/kiddin9' >> repositories.conf
-          
-          # Set hostname
           echo 'CONFIG_HOST_NAME="Masta-GOHIM"' >> .config
+          echo 'src/gz kiddin9 https://dl.openwrt.ai/releases/25.12/packages/x86_64/kiddin9' >> repositories.conf
 
-      - name: Build image
+      - name: Build OpenWrt image
         run: |
           cd /tmp/kwrt-imagebuilder-x86-64.Linux-x86_64
-          
           PACKAGES="ttyd luci luci-app-mwan3 luci-app-wireguard luci-app-openvpn \
             luci-app-sqm luci-app-nlbwmon luci-app-opkg luci-app-commands \
-            luci-app-ttyd luci-theme-bootstrap luci-mod-admin-full \
+            luci-app-ttyd luci-theme-bootstrap \
             modemmanager qmi-utils uqmi usbutils usb-modeswitch \
             luci-app-passwall luci-app-openclash luci-app-filebrowser-go \
             luci-proto-ncm luci-proto-qmi \
             kmod-usb-core kmod-usb-ohci kmod-usb-ehci kmod-usb-xhci \
             kmod-usb-net-qmi-wwan kmod-usb-net-cdc-mbim kmod-usb-net-cdc-ncm \
             kmod-usb-serial-option kmod-usb-serial-wwan"
-
-          echo "Building with packages..."
           make image PROFILE=generic PACKAGES="$PACKAGES" 2>&1 | tail -40
 
-      - name: Verify
+      - name: Verify output
         run: |
           cd /tmp/kwrt-imagebuilder-x86-64.Linux-x86_64
-          ls -la bin/targets/x86/64/generic*/ | grep -E '\.(img|gz|manifest)'
+          ls -la bin/targets/x86/64/generic* | grep -E '\.(img|gz|manifest)'
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: openwrt-masta-gohim-all
-          path: /tmp/kwrt-imagebuilder-x86-64.Linux-x86_64/bin/targets/x86/64/generic*/
+          name: openwrt-masta-gohim
+          path: /tmp/kwrt-imagebuilder-x86-64.Linux-x86_64/bin/targets/x86/64/generic/
 
       - name: Create Release
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: /tmp/kwrt-imagebuilder-x86-64.Linux-x86_64/bin/targets/x86/64/generic*/*
+          files: /tmp/kwrt-imagebuilder-x86-64.Linux-x86_64/bin/targets/x86/64/generic/*
           name: OpenWrt 25.12 - Masta GOHIM All-in-One
           body: |
-            ## 🏷️ Hostname: Masta-GOHIM
-            
-            ### 📦 All-in-One Image
-            - ✅ ttyd + luci-app-ttyd - Web terminal
-            - ✅ luci-app-passwall + luci-app-openclash - Proxy tools
-            - ✅ luci-app-filebrowser-go - Web file manager
-            - ✅ mwan3, wireguard, openvpn, sqm, nlbwmon
-            - ✅ modemmanager, qmi-utils, uqmi - 4G/5G modem support
-            - ✅ USB + CDC drivers
-            - ✅ WiFi drivers (compiled into kernel of base image)
-            
-            ### 🚀 Deploy
+            ## Hostname: Masta-GOHIM
+
+            ### Built-in Tools
+            - ttyd + luci-app-ttyd - Web terminal
+            - luci-app-passwall + luci-app-openclash - Proxy tools
+            - luci-app-filebrowser-go - Web file manager
+            - mwan3, wireguard, openvpn, sqm, nlbwmon
+            - modemmanager, qmi-utils, uqmi - 4G/5G modem
+            - USB + CDC drivers
+
+            ### Deploy
             gunzip openwrt*.img.gz
             dd if=openwrt*.img of=/dev/sdX bs=4M
             sync
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
