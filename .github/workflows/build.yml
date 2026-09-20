@@ -2,7 +2,8 @@ name: Build OpenWrt 25.12 Masta GOHIM
 
 on:
   push:
-    branches: [master]
+    branches: [ master ]
+  tags: [ 'v*' ]
   workflow_dispatch:
 
 jobs:
@@ -32,47 +33,35 @@ jobs:
       - name: Build OpenWrt image
         run: |
           cd /tmp/kwrt-imagebuilder-x86-64.Linux-x86_64
-          PACKAGES="ttyd luci luci-app-mwan3 luci-app-wireguard luci-app-openvpn \
-            luci-app-sqm luci-app-nlbwmon luci-app-opkg luci-app-commands \
-            luci-app-ttyd luci-theme-bootstrap \
+          PACKAGES="ttyd luci luci-app-mwan3 luci-app-wireguard luci-app-openvpn luci-app-sqm \
+            luci-app-nlbwmon luci-app-opkg luci-app-commands luci-app-ttyd luci-theme-bootstrap \
             modemmanager qmi-utils uqmi usbutils usb-modeswitch \
-            luci-app-passwall luci-app-openclash luci-app-filebrowser-go \
-            luci-proto-ncm luci-proto-qmi \
+            luci-app-passwall luci-app-openclash luci-app-filebrowser-go luci-proto-ncm luci-proto-qmi \
             kmod-usb-core kmod-usb-ohci kmod-usb-ehci kmod-usb-xhci \
-            kmod-usb-net-qmi-wwan kmod-usb-net-cdc-mbim kmod-usb-net-cdc-ncm \
-            kmod-usb-serial-option kmod-usb-serial-wwan"
-          make image PROFILE=generic PACKAGES="$PACKAGES" 2>&1 | tail -40
+            kmod-usb-net-qmi-wwan kmod-usb-net-cdc-mbim kmod-usb-net-cdc-ncm kmod-usb-serial-option"
+          make image PROFILE=generic PACKAGES="$PACKAGES" 2>&1 | tail -50
 
-      - name: Verify output
+      - name: Find output
         run: |
           cd /tmp/kwrt-imagebuilder-x86-64.Linux-x86_64
-          ls -la bin/targets/x86/64/generic* | grep -E '\.(img|gz|manifest)'
+          find bin/targets/x86/64 -name "*.img*" -o -name "*.manifest" -o -name "*.gz" | head -20
+          ls -la bin/targets/x86/64/
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: openwrt-masta-gohim
-          path: /tmp/kwrt-imagebuilder-x86-64.Linux-x86_64/bin/targets/x86/64/generic/
+          path: /tmp/kwrt-imagebuilder-x86-64.Linux-x86_64/bin/targets/x86/64/
 
       - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: /tmp/kwrt-imagebuilder-x86-64.Linux-x86_64/bin/targets/x86/64/generic/*
+          files: /tmp/kwrt-imagebuilder-x86-64.Linux-x86_64/bin/targets/x86/64/*
           name: OpenWrt 25.12 - Masta GOHIM All-in-One
           body: |
             ## Hostname: Masta-GOHIM
-
-            ### Built-in Tools
-            - ttyd + luci-app-ttyd - Web terminal
-            - luci-app-passwall + luci-app-openclash - Proxy tools
-            - luci-app-filebrowser-go - Web file manager
-            - mwan3, wireguard, openvpn, sqm, nlbwmon
-            - modemmanager, qmi-utils, uqmi - 4G/5G modem
-            - USB + CDC drivers
-
-            ### Deploy
-            gunzip openwrt*.img.gz
-            dd if=openwrt*.img of=/dev/sdX bs=4M
-            sync
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            
+            Built-in: ttyd, luci, passwall, openclash, filebrowser, mwan3, wireguard, openvpn, sqm, modemmanager, qmi-utils
+            
+            Flash & use immediately! No post-install required for core features.
