@@ -1,4 +1,4 @@
-name: Build OpenWrt 25.12
+name: Build OpenWrt 25.12 All-in-One
 
 on:
   push:
@@ -28,7 +28,7 @@ jobs:
         run: |
           cd /tmp/kwrt-imagebuilder-x86-64.Linux-x86_64
           
-          # Add Kiddin9 community feed (has passwall, openclash, filebrowser)
+          # Add Kiddin9 community feed
           echo 'src/gz kiddin9 https://dl.openwrt.ai/releases/25.12/packages/x86_64/kiddin9' >> repositories.conf
           
           # Set hostname
@@ -43,9 +43,13 @@ jobs:
             luci-app-ttyd luci-theme-bootstrap luci-mod-admin-full \
             modemmanager qmi-utils uqmi usbutils usb-modeswitch \
             luci-app-passwall luci-app-openclash luci-app-filebrowser-go \
-            luci-proto-ncm luci-proto-qmi"
+            luci-proto-ncm luci-proto-qmi \
+            kmod-usb-core kmod-usb-ohci kmod-usb-ehci kmod-usb-xhci \
+            kmod-usb-net-qmi-wwan kmod-usb-net-cdc-mbim kmod-usb-net-cdc-ncm \
+            kmod-usb-serial-option kmod-usb-serial-wwan"
 
-          make image PROFILE=generic PACKAGES="$PACKAGES" 2>&1 | tail -30
+          echo "Building with packages..."
+          make image PROFILE=generic PACKAGES="$PACKAGES" 2>&1 | tail -40
 
       - name: Verify
         run: |
@@ -55,7 +59,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: openwrt-masta-gohim
+          name: openwrt-masta-gohim-all
           path: /tmp/kwrt-imagebuilder-x86-64.Linux-x86_64/bin/targets/x86/64/generic*/
 
       - name: Create Release
@@ -63,21 +67,20 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: /tmp/kwrt-imagebuilder-x86-64.Linux-x86_64/bin/targets/x86/64/generic*/*
-          name: OpenWrt 25.12 - Masta GOHIM Edition
+          name: OpenWrt 25.12 - Masta GOHIM All-in-One
           body: |
             ## 🏷️ Hostname: Masta-GOHIM
             
-            ### 📦 Built-in Tools (25.12)
+            ### 📦 All-in-One Image
             - ✅ ttyd + luci-app-ttyd - Web terminal
-            - ✅ passwall + openclash - Proxy tools
-            - ✅ filebrowser-go - Web file manager
-            - ✅ mwan3, wireguard, openvpn - Network tools
-            - ✅ modemmanager, qmi-utils - 4G/5G modem
+            - ✅ luci-app-passwall + luci-app-openclash - Proxy tools
+            - ✅ luci-app-filebrowser-go - Web file manager
+            - ✅ mwan3, wireguard, openvpn, sqm, nlbwmon
+            - ✅ modemmanager, qmi-utils, uqmi - 4G/5G modem support
+            - ✅ USB + CDC drivers
+            - ✅ WiFi drivers (compiled into kernel of base image)
             
-            ### 📥 WiFi Drivers: Install after flash
-            ```bash
-            opkg update
-            opkg install kmod-iwlwifi kmod-ath11k-pci kmod-mt7921e kmod-rtl8xxxu
-            ```
-            
-            Build date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+            ### 🚀 Deploy
+            gunzip openwrt*.img.gz
+            dd if=openwrt*.img of=/dev/sdX bs=4M
+            sync
