@@ -3,7 +3,6 @@ name: OpenWrt Build
 on:
   push:
     branches: [ master ]
-  tags: ['v*']
   workflow_dispatch:
 
 jobs:
@@ -43,7 +42,7 @@ jobs:
       - name: Verify output
         run: |
           cd /tmp/kwrt-imagebuilder-x86-64.Linux-x86_64
-          find bin -type f | head -20
+          find bin -type f -name "*.img*" -o -name "*.gz" -o -name "*.manifest" | head -20
 
       - name: Upload
         uses: actions/upload-artifact@v4
