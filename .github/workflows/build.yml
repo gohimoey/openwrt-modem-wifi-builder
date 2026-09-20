@@ -1,11 +1,9 @@
-name: Build OpenWrt x86_64
+name: OpenWrt x86_64 UEFI
 
 on:
   push:
-    branches:
-      - master
-    tags:
-      - 'v*'
+    branches: [ master ]
+  tags: [ 'v*' ]
   workflow_dispatch:
 
 jobs:
@@ -30,15 +28,31 @@ jobs:
         run: |
           cd /tmp/openwrt-imagebuilder-23.05.4-x86-64.Linux-x86_64
 
-          PACKAGES="kmod-ath11k kmod-ath10k-ct kmod-iwlwifi kmod-mt7915e kmod-mt7921e kmod-mt7921u kmod-brcmfmac kmod-rtl8xxxu kmod-usb-net-qmi-wwan kmod-usb-net-cdc-mbim kmod-usb-net-cdc-ncm kmod-usb-net-huawei-cdc-ncm kmod-usb-net-sierrawireless kmod-usb-serial-option kmod-usb-serial-wwan kmod-mhi-wwan-ctrl kmod-usb-core kmod-usb2 kmod-usb3 kmod-usb-net kmod-usb-xhci-hcd qmi-utils uqmi modemmanager luci luci-app-mwan3 luci-app-wireguard luci-app-openvpn luci-app-sqm luci-app-nlbwmon luci-app-opkg"
+          # Packages: ttyd + WiFi Modem + Tools + hostname
+          PACKAGES="ttyd luci luci-app-mwan3 luci-app-wireguard luci-app-openvpn \
+            luci-app-sqm luci-app-nlbwmon luci-app-opkg luci-app-statistics luci-mod-status \
+            luci-theme-bootstrap luci-proto-ncm luci-proto-qmi \
+            kmod-ath11k kmod-iwlwifi kmod-mt7915e kmod-mt7921e kmod-brcmfmac \
+            kmod-usb-net-qmi-wwan kmod-usb-net-cdc-mbim kmod-usb-net-cdc-ncm \
+            kmod-usb-serial-option kmod-usb-serial-wwan modemmanager qmi-utils uqmi \
+            luci-app-commands kmod-sched-core kmod-ipt-nat-extra"
 
-          make image PROFILE=generic PACKAGES="$PACKAGES" V=s 2>&1 | tail -60
+          make image PROFILE=generic PACKAGES="$PACKAGES" V=s 2>&1 | tail -50
+
+      - name: Set hostname
+        run: |
+          cd /tmp/openwrt-imagebuilder-23.05.4-x86-64.Linux-x86_64
+          # Add hostname to profile
+          echo 'CONFIG_HOST_NAME="Masta-GOHIM"' >> .config
+          # Or embed in image via root filesystem
+          mkdir -p staging_dir/target-x86_64/root/etc
+          echo "Masta-GOHIM" > staging_dir/target-x86_64/root/etc/hostname
+          echo "127.0.0.1 localhost Masta-GOHIM" > staging_dir/target-x86_64/root/etc/hosts
 
       - name: Verify output
         run: |
           cd /tmp/openwrt-imagebuilder-23.05.4-x86-64.Linux-x86_64
-          echo "=== Output images ==="
-          ls -la bin/targets/x86/64/ 2>/dev/null || echo "No images found"
+          ls -la bin/targets/x86/64/
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -50,7 +64,29 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: /tmp/openwrt-imagebuilder-23.05.4-x86-64.Linux-x86-64/bin/targets/x86/64/*
-          name: OpenWrt x86_64 - Modem WiFi Support
+          files: /tmp/openwrt-imagebuilder-23.05.4-x86-64.Linux-x86_64/bin/targets/x86/64/*
+          name: OpenWrt x86_64 - Masta GOHIM Edition
+          body: |
+            ## 🏷️ Hostname: **Masta-GOHIM**
+            
+            ### 📦 Built-in Tools
+            - ✅ ttyd - Web terminal
+            - ✅ modemmanager, qmi-utils, uqmi - 4G/5G modem support
+            - ✅ WiFi drivers: ath11k, iwlwifi, mt79xx
+            - ✅ LuCI: mwan3, wireguard, openvpn, sqm, nlbwmon
+            - ✅ luci-app-commands - CLI tools in web UI
+            
+            ### 📥 Post-install: Install Passwall + OpenClash
+            ```bash
+            # Add passwall feed
+            echo "src/gz passwall http://op.supes.fun/packages" >> /etc/opkg/customfeeds.conf
+            opkg update
+            opkg install luci-app-passwall
+            
+            # Add openclash feed  
+            echo "src/gz openclash https://github.com/vergesZhu/packages/releases/download/v1.0/oci86" >> /etc/opkg/customfeeds.conf
+            opkg update
+            opkg install luci-app-openclash
+            ```
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
