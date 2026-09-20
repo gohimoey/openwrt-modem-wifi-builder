@@ -57,18 +57,17 @@ jobs:
             ## Hostname: Masta-GOHIM
 
             ### ✅ Built-in Tools
-            - ttyd (web terminal via luci-app-ttyd)
+            - luci-app-ttyd (web terminal)
             - luci-app-passwall (proxy)
             - luci-app-openclash (proxy)
             - luci-app-filebrowser-go (file manager)
             - mwan3, wireguard, openvpn, sqm, nlbwmon
-            - modemmanager, qmi-utils (4G/5G modem)
+            - modemmanager, qmi-utils (4G/5G)
             - WiFi drivers compiled-in
 
             ### 🚀 Flash
             Download .img.gz, gunzip, dd to USB.
-            
-            Access LuCI at 192.168.1.1
+          files: /tmp/output/*
           draft: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
