@@ -33,20 +33,23 @@ jobs:
       - name: Build image
         run: |
           cd /tmp/kwrt-imagebuilder-x86-64.Linux-x86_64
-          PACKAGES="ttyd luci luci-app-mwan3 luci-app-wireguard luci-app-openvpn luci-app-sqm \
+          PACKAGES="luci luci-app-mwan3 luci-app-wireguard luci-app-openvpn luci-app-sqm \
             luci-app-nlbwmon luci-app-opkg luci-app-ttyd \
             modemmanager qmi-utils usbutils usb-modeswitch \
             luci-app-passwall luci-app-openclash luci-app-filebrowser-go luci-proto-ncm"
           make image PROFILE=generic PACKAGES="$PACKAGES" 2>&1 | tail -50
 
-      - name: Verify
+      - name: Verify output
         run: |
           cd /tmp/kwrt-imagebuilder-x86-64.Linux-x86_64
-          find bin -type f -name "*efi*.img*" -o -name "*manifest" | head -20
-
+          echo "=== Output files ==="
+          find bin -type f | head -30
+          
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: openwrt-masta-gohim-v5
-          path: /tmp/kwrt-imagebuilder-x86-64.Linux-x86_64/bin/targets/x86/64/generic*/*
+          path: |
+            /tmp/kwrt-imagebuilder-x86-64.Linux-x86_64/bin/
+            /tmp/kwrt-imagebuilder-x86-64.Linux-x86_64/bin/targets/x86/64/
           retention-days: 30
