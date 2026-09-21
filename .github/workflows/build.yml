@@ -9,27 +9,26 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     timeout-minutes: 120
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Install deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y make gawk unzip wget zstd
+        run: sudo apt-get update && sudo apt-get install -y make gawk unzip wget zstd
 
-      - name: Download ImageBuilder
+      - name: Download ImageBuilder (kwrt 25.12)
         run: |
           cd /tmp
           wget -q "https://dl.openwrt.ai/releases/25.12/targets/x86/64/kwrt-imagebuilder-x86-64.Linux-x86_64.tar.zst"
           tar --zstd -xf kwrt-imagebuilder-x86-64.Linux-x86_64.tar.zst
 
-      - name: Configure hostname + feeds
+      - name: Configure hostname + Kiddin9 feed
         run: |
           cd /tmp/kwrt-imagebuilder-x86-64.Linux-x86_64
           echo 'CONFIG_HOST_NAME="Masta-GOHIM"' >> .config
           echo 'src/gz kiddin9 https://dl.openwrt.ai/releases/25.12/packages/x86_64/kiddin9' >> repositories.conf
 
-      - name: Build image
+      - name: Build Image
         run: |
           cd /tmp/kwrt-imagebuilder-x86-64.Linux-x86_64
           PACKAGES="luci luci-app-mwan3 luci-app-wireguard luci-app-openvpn luci-app-sqm \
@@ -42,13 +41,44 @@ jobs:
         run: |
           cd /tmp/kwrt-imagebuilder-x86-64.Linux-x86_64
           mkdir -p /tmp/output
-          find bin/targets -name "*.img.gz" -exec cp {} /tmp/output/ \;
-          find bin/targets -name "*.manifest" -exec cp {} /tmp/output/ \;
-          ls -la /tmp/output/
+          find bin/targets -name "*.img*" -type f -exec cp {} /tmp/output/ \;
+          find bin/targets -name "*.manifest" -type f -exec cp {} /tmp/output/ \;
+          echo "=== Files in /tmp/output ==="
+          ls -lh /tmp/output/
 
-      - name: Upload artifact
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: openwrt-masta-gohim
           path: /tmp/output/
           retention-days: 7
+
+      - name: Delete old tag
+        run: |
+          git tag -d masta-gohim-25.12 2>/dev/null || true
+          git push origin :masta-gohim-25.12 2>/dev/null || true
+
+      - name: Create Release
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: masta-gohim-25.12
+          name: OpenWrt 25.12 - Masta GOHIM All-in-One
+          body: |
+            ## Hostname: Masta-GOHIM
+
+            ### ✅ Built-in Tools
+            - luci-app-ttyd (web terminal)
+            - luci-app-passwall (proxy)
+            - luci-app-openclash (proxy)
+            - luci-app-filebrowser-go (file manager)
+            - mwan3, wireguard, openvpn, sqm, nlbwmon
+            - modemmanager, qmi-utils (4G/5G)
+            - WiFi drivers compiled-in
+
+            ### 🚀 Flash
+            Download .img.gz, gunzip, dd to USB.
+          files: /tmp/output/*
+          draft: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
