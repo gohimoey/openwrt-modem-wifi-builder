@@ -9,7 +9,6 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     timeout-minutes: 120
-
     steps:
       - uses: actions/checkout@v4
 
@@ -43,37 +42,11 @@ jobs:
         run: |
           cd /tmp/kwrt-imagebuilder-x86-64.Linux-x86_64
           mkdir -p /tmp/output
-          cp bin/targets/x86/64/generic*/openwrt-*.img.gz /tmp/output/ 2>/dev/null || cp bin/targets/x86/64/openwrt-*.img.gz /tmp/output/ 2>/dev/null || true
-          cp bin/targets/x86/64/generic*/*.manifest /tmp/output/ 2>/dev/null || true
-          ls -laR bin/targets/x86/64/ | head -30
+          find bin/targets -name "*.img.gz" -exec cp {} /tmp/output/ \;
+          find bin/targets -name "*.manifest" -exec cp {} /tmp/output/ \;
           ls -la /tmp/output/
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: masta-gohim-25.12
-          name: OpenWrt 25.12 - Masta GOHIM All-in-One
-          body: |
-            ## Hostname: Masta-GOHIM
-
-            ### ✅ Built-in Tools
-            - luci-app-ttyd (web terminal)
-            - luci-app-passwall (proxy)
-            - luci-app-openclash (proxy)
-            - luci-app-filebrowser-go (file manager)
-            - mwan3, wireguard, openvpn, sqm, nlbwmon
-            - modemmanager, qmi-utils (4G/5G)
-            - WiFi drivers compiled-in
-
-            ### 🚀 Flash
-            Download .img.gz, gunzip, dd to USB.
-          files: /tmp/output/*
-          draft: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Upload artifact
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: openwrt-masta-gohim
