@@ -48,6 +48,12 @@ jobs:
           echo "=== File sizes ==="
           ls -lh bin/targets/x86/64/*.img.gz 2>/dev/null || echo "Image not found"
 
+      - name: Copy to output
+        run: |
+          cd /tmp/kwrt-imagebuilder-x86-64.Linux-x86_64
+          mkdir -p /tmp/output
+          cp bin/targets/x86/64/*.img.gz /tmp/output/ 2>/dev/null || find bin -name "*.img*" -exec cp {} /tmp/output/ \;
+
       - name: Create Release (with file upload)
         uses: softprops/action-gh-release@v2
         with:
@@ -69,7 +75,7 @@ jobs:
             1. Download firmware
             2. gunzip firmware.img.gz
             3. dd if=firmware.img of=/dev/sdX bs=4M
-          files: bin/targets/x86/64/*.img.gz
+          files: /tmp/output/*.img.gz
           fail_on_tag_exists: false
           draft: false
         env:
