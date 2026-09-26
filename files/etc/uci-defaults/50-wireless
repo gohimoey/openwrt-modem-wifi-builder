@@ -1,16 +1,20 @@
 #!/bin/sh
-# Generate wifi-device/wifi-iface otomatis pada first boot.
-# Tidak hardcode path PCIe — path MT7921 berubah-ubah tiap BIOS/board.
+# Enable radio0, set SSID to 'Masta Gohim', open encryption, attach to lan
 wifi config 2>/dev/null || true
-# pastikan radio0 aktif + SSID sesuai profil
-uci -q set wireless.radio0.disabled=0
-uci -q set wireless.radio0.hwmode='11g'
-uci -q set wireless.radio0.htmode='20'
-uci -q set wireless.radio0.channel='auto'
-uci -q del wireless.@wifi-iface[0].ssid 2>/dev/null
-uci -q set wireless.@wifi-iface[0].ssid='Masta Gohim'
-uci -q set wireless.@wifi-iface[0].encryption='none'
-uci -q set wireless.@wifi-iface[0].network='lan'
+
+# Find all wireless radios configured
+for r in $(uci show wireless | grep '=wifi-device' | cut -d'.' -f2); do
+    uci set wireless.$r.disabled='0'
+    uci set wireless.$r.channel='auto'
+done
+
+# Configure first wifi-iface if exists
+if uci get wireless.@wifi-iface[0] >/dev/null 2>&1; then
+    uci set wireless.@wifi-iface[0].ssid='Masta Gohim'
+    uci set wireless.@wifi-iface[0].encryption='none'
+    uci set wireless.@wifi-iface[0].network='lan'
+fi
+
 uci commit wireless
 wifi reload 2>/dev/null || true
 exit 0
