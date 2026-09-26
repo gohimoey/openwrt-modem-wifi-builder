@@ -1,12 +1,9 @@
-config device
-    option name 'wan'
+# Default aman. 50-lan-detect (uci-defaults) yang menentukan port asli
+# dan mengisi br-lan. Disengaja TIDAK hardcode eth0/eth1: bridge dengan
+# port yang tidak ada tidak terbentuk, jadi LAN + LuCI mati.
+config device 'lanb'
+    option name 'br-lan'
     option type 'bridge'
-    list ports 'eth0'
-
-config device
-    option name 'lan'
-    option type 'bridge'
-    list ports 'eth1'
 
 config interface 'loopback'
     option device 'lo'
@@ -21,11 +18,3 @@ config interface 'lan'
     option netmask '255.255.255.0'
     option delegate '0'
     option ip6assign '60d'
-
-config interface 'wan'
-    option device 'br-wan'
-    option proto 'dhcp'
-
-config interface 'wan6'
-    option device 'br-wan'
-    option proto 'dhcpv6'
