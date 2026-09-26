@@ -1,0 +1,14 @@
+# ImageBuilder & mirror (terlalu besar, unduh manual)
+extract/
+packages_dl/
+make-local/
+packages/
+build_dir/
+staging_dir/
+
+# Output firmware
+bin/
+
+# OS junk
+.DS_Store
+*.swp
