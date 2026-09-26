@@ -1,39 +1,18 @@
 #!/bin/sh
-# Aktifkan semua radio, SSID 'Masta Gohim' (open), attach ke lan.
-# Driver MT7921 (PCIe/USB) bisa baru settle beberapa detik setelah boot,
-# jadi `wifi config` dicoba berulang — kalau tidak, wireless tetap kosong.
-
 i=0
-while [ $i -lt 10 ]; do
+while [ $i -lt 20 ]; do
     [ -n "$(uci show wireless 2>/dev/null | grep '=wifi-device')" ] && break
-    wifi config 2>/dev/null || true
-    sleep 1
-    i=$((i + 1))
+    wifi config; sleep 2; i=$((i+1))
 done
-
 for r in $(uci show wireless 2>/dev/null | grep '=wifi-device' | cut -d. -f2 | cut -d= -f1); do
     uci set wireless.$r.disabled='0'
     uci set wireless.$r.country='ID'
+    uci set wireless.$r.htmode='HE80'
 done
-
-i=0
-while [ $i -lt 10 ]; do
-    uci get wireless.@wifi-iface[0] >/dev/null 2>&1 && break
-    wifi config 2>/dev/null || true
-    sleep 1
-    i=$((i + 1))
+for s in $(uci show wireless 2>/dev/null | grep '=wifi-iface' | cut -d. -f2 | cut -d= -f1); do
+    uci set wireless.$s.ssid='Masta Gohim'
+    uci set wireless.$s.encryption='none'
+    uci set wireless.$s.network='lan'
 done
-
-if uci get wireless.@wifi-iface[0] >/dev/null 2>&1; then
-    for s in $(uci show wireless 2>/dev/null | grep '=wifi-iface' | cut -d. -f2 | cut -d= -f1); do
-        uci set wireless.$s.ssid='Masta Gohim'
-        uci set wireless.$s.encryption='none'
-        uci set wireless.$s.network='lan'
-    done
-    uci commit wireless
-    wifi reload 2>/dev/null || true
-    echo "50-wireless: $(uci show wireless | grep -c '=wifi-device') radio aktif, SSID Masta Gohim"
-else
-    echo "50-wireless: GAGAL, tidak ada wifi-iface — cek dmesg | grep -i mt79"
-fi
-exit 0
+uci commit wireless
+wifi reload
