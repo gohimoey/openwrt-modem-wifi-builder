@@ -1,18 +1,49 @@
 #!/bin/sh
+# Generate /etc/config/wireless on first boot, lalu set SSID.
+#
+# Dua jebakan yang bikin r5 gagal:
+#
+# 1) /etc/init.d/boot menjalankan `wifi config` SEBELAH kmodloader dimuat.
+#    Driver PCIe belum ada -> /etc/config/wireless ter-create KOSONG.
+#
+# 2) `wifi config` di 25.12 hanya `touch` file kalau belum ada; kalau
+#    sudah ada dia tidak regenerate. Jadi file kosong dari langkah (1)
+#    akan menggantung selamanya. Karena itu file dihapus dulu di sini.
+#
+# Nama radio (radio0/radio1) tidak di-hardcode: berubah antar BIOS/board.
+
+rm -f /etc/config/wireless
+
 i=0
-while [ $i -lt 20 ]; do
-    [ -n "$(uci show wireless 2>/dev/null | grep '=wifi-device')" ] && break
-    wifi config; sleep 2; i=$((i+1))
+while [ $i -lt 30 ]; do
+	wifi config >/dev/null 2>&1
+	[ -n "$(uci -q show wireless | grep '=wifi-device')" ] && break
+	sleep 1
+	i=$((i + 1))
 done
-for r in $(uci show wireless 2>/dev/null | grep '=wifi-device' | cut -d. -f2 | cut -d= -f1); do
-    uci set wireless.$r.disabled='0'
-    uci set wireless.$r.country='ID'
-    uci set wireless.$r.htmode='HE80'
+
+# Aktifkan semua radio + region ID (bukan default US, supaya channel
+# 5GHz dan TX power tidak terkunci regulatory).
+for r in $(uci -q show wireless | grep '=wifi-device' | cut -d. -f2 | cut -d= -f1); do
+	uci -q set wireless.$r.disabled='0'
+	uci -q set wireless.$r.country='ID'
+	uci -q set wireless.$r.channel='auto'
+	# 2.4GHz (hwmode 11g) tidak mendukung HE80
+	if [ "$(uci -q get wireless.$r.hwmode)" = "11g" ]; then
+		uci -q set wireless.$r.htmode='HE40'
+	else
+		uci -q set wireless.$r.htmode='HE80'
+	fi
 done
-for s in $(uci show wireless 2>/dev/null | grep '=wifi-iface' | cut -d. -f2 | cut -d= -f1); do
-    uci set wireless.$s.ssid='Masta Gohim'
-    uci set wireless.$s.encryption='none'
-    uci set wireless.$s.network='lan'
+
+# SSID untuk SEMUA wifi-iface, bukan hanya index 0
+for s in $(uci -q show wireless | grep '=wifi-iface' | cut -d. -f2 | cut -d= -f1); do
+	uci -q set wireless.$s.ssid='Masta Gohim'
+	uci -q set wireless.$s.encryption='none'
+	uci -q set wireless.$s.network='lan'
+	uci -q set wireless.$s.disabled='0'
 done
+
 uci commit wireless
-wifi reload
+wifi reload >/dev/null 2>&1
+exit 0

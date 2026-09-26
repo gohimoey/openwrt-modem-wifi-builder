@@ -1,20 +1,32 @@
-# Default aman. 50-lan-detect (uci-defaults) yang menentukan port asli
-# dan mengisi br-lan. Disengaja TIDAK hardcode eth0/eth1: bridge dengan
-# port yang tidak ada tidak terbentuk, jadi LAN + LuCI mati.
+# Masta-GOHIM - default config jaringan.
+#
+# PENTING: br-lan WAJIB punya minimal satu `list ports`. Kalau bridge tanpa
+# port, netifd tidak pernah brings-up -> tidak ada DHCP -> PC dapat 169.254.x
+# persis seperti gejala di r5. eth0 dicantumkan sebagai jaring pengaman;
+# 50-lan-detect menambah port lain yang ditemukan dan tidak pernah menghapus
+# yang sudah ada.
+#
+# Tidak ada interface WAN. Di router, uplink lewat WiFi/5G. Kalau suatu hari
+# butuh WAN, tambahkan manual lewat LuCI.
+#
+# Catatan: section ini memakai `type bridge` + `list ports` (bukan `ifname`)
+# supaya 11_network-migrate-bridges tidak mengubahnya.
+
 config device 'lanb'
-    option name 'br-lan'
-    option type 'bridge'
+	option name 'br-lan'
+	option type 'bridge'
+	list ports 'eth0'
 
 config interface 'loopback'
-    option device 'lo'
-    option proto 'static'
-    option ipaddr '127.0.0.1'
-    option netmask '255.0.0.0'
+	option device 'lo'
+	option proto 'static'
+	option ipaddr '127.0.0.1'
+	option netmask '255.0.0.0'
 
 config interface 'lan'
-    option device 'br-lan'
-    option proto 'static'
-    option ipaddr '192.168.1.1'
-    option netmask '255.255.255.0'
-    option delegate '0'
-    option ip6assign '60d'
+	option device 'br-lan'
+	option proto 'static'
+	option ipaddr '192.168.1.1'
+	option netmask '255.255.255.0'
+	option delegate '0'
+	option ip6assign '60d'

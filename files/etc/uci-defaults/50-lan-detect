@@ -1,15 +1,33 @@
 #!/bin/sh
-for p in $(ls /sys/class/net); do
-    [ -e "/sys/class/net/$p/device" ] || continue
-    case "$p" in
-        lo|br-*|bat*|tun*|tap*|wg*|wwan*|rmnet*|p2p*|ifb*|teql*|gre*|erspan*|ip6tnl*|sit*|bond*|vlan*|eth0.*) continue ;;
-    esac
-    REAL="$REAL $p"
+# Tambahkan port Ethernet fisik lain ke br-lan.
+#
+# CATATAN PENTING (bug r5): script versi lama melakukan split WAN/LAN:
+#   WAN="$1"; shift; LAN="$*"
+# Di mini PC hanya ada 1x RJ45 -> eth0 jadi "WAN", LAN kosong ->
+# br-lan tanpa port -> tidak ada DHCP -> PC dapat 169.254.215.48.
+# Di router SEMUA port = LAN. Tidak ada WAN.
+#
+# Script ini tidak pernah menghapus port: eth0 sudah di-hardcode di
+# /etc/config/network sebagai fallback, jadi bridge tetap hidup walau
+# deteksi gagal.
+
+CURRENT=$(uci -q get network.lanb.ports | tr '\n' ' ')
+
+for p in $(ls /sys/class/net 2>/dev/null); do
+	[ -e "/sys/class/net/$p/device" ] || continue
+	case "$p" in
+			lo|br*|vir*|bat*|tun*|tap*|wg*|wwan*|rmnet*|p2p*|ifb*|teql*|gre*|erspan*|ip6tnl*|sit*|bond*|vlan*|eth0.*|veth*|ifb*|docker*|lxc*) continue ;;
+		esac
+			;;
+		*.*) continue ;;  # sub-interface vlan, bukan parent
+	esac
+	case " $CURRENT " in
+		*" $p "*) continue ;;  # sudah ada
+	esac
+	uci add_list network.lanb.ports="$p"
+	CURRENT="$CURRENT $p"
 done
-set -- $REAL
-WAN="$1"; shift
-LAN="$*"
-uci -q delete network.lanb.ports
-for p in $LAN; do uci add_list network.lanb.ports="$p"; done
+
 uci commit network
-/etc/init.d/network restart
+/etc/init.d/network reload
+exit 0
