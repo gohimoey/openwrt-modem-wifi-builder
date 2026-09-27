@@ -1,38 +1,5 @@
 #!/bin/sh
-# Generate /etc/config/wireless on first boot, lalu set SSID.
-# Loop delay krn driver WiFi butuh time untuk load (terutama iwlwifi).
-
-rm -f /etc/config/wireless
-
-i=0
-while [ $i -lt 60 ]; do
-	wifi config >/dev/null 2>&1
-	[ -n "$(uci -q show wireless | grep '=wifi-device')" ] && break
-	sleep 0.5
-	i=$((i + 1))
-done
-
-# Aktifkan semua radio + region ID (bukan default US)
-for r in $(uci -q show wireless | grep '=wifi-device' | cut -d. -f2 | cut -d= -f1); do
-	uci -q set wireless.$r.disabled='0'
-	uci -q set wireless.$r.country='ID'
-	uci -q set wireless.$r.region='00'
-	uci -q set wireless.$r.channel='auto'
-	if [ "$(uci -q get wireless.$r.hwmode)" = "11g" ]; then
-		uci -q set wireless.$r.htmode='HE40'
-	else
-		uci -q set wireless.$r.htmode='HE80'
-	fi
-done
-
-# SSID untuk SEMUA wifi-iface
-for s in $(uci -q show wireless | grep '=wifi-iface' | cut -d. -f2 | cut -d= -f1); do
-	uci -q set wireless.$s.ssid='Masta Gohim'
-	uci -q set wireless.$s.encryption='none'
-	uci -q set wireless.$s.network='lan'
-	uci -q set wireless.$s.disabled='0'
-done
-
-uci commit wireless
-wifi up 2>/dev/null || wifi reload 2>/dev/null
+# Dynamic WiFi configuration via mywifi (kwrt pattern)
+# Waits for phy, creates/updates wireless config, sets SSID, commits, up
+/usr/sbin/mywifi
 exit 0

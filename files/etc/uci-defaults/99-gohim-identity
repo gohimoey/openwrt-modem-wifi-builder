@@ -3,6 +3,9 @@
 #
 # WiFi SENGAJA tidak disentuh di sini: 50-wireless sudah mengaturnya,
 # dan menimpa config dari script ini hanya bisa merusak hasil deteksi radio.
+#
+# TAPI kita perlu mywifi di sini untuk memastikan WiFi terkonfigurasi
+# setelah semua baseload (modem detect, hostname, banner) selesai.
 
 # --- Identity ---
 uci -q batch <<-'EOF'
@@ -84,4 +87,8 @@ fi
 } > /www/gohim-diag.txt 2>&1
 
 uci -q commit
+
+# --- WiFi: pastikan terkonfigurasi setelah identitas selesai ---
+/usr/sbin/mywifi
+
 exit 0
