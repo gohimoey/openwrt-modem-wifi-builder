@@ -1,7 +1,9 @@
 #!/bin/sh
-# Auto-detect and assign network interfaces dynamically:
+# Auto-detect and assign network interfaces dynamically (uci-defaults runs once on first boot):
 # - PCI Ethernet / Wireless -> br-lan
 # - USB Ethernet -> wan / wan6
+# NOTE: jangan panggil `ip link set master br-lan` di sini; br-lan belum exist.
+# Network init nanti yang handle port-list dari UCI. Hotplug handle NIC yang load belakangan.
 
 LOG=/tmp/lan-detect.log
 exec >>"$LOG" 2>&1
@@ -32,15 +34,12 @@ for dev in $(ls /sys/class/net 2>/dev/null); do
 			WAN_ASSIGNED=1
 		fi
 	elif echo "$DEVPATH" | grep -q "/pci" || [ -d "/sys/class/net/$dev/wireless" ]; then
-		if ! ip -o link show "$dev" 2>/dev/null | grep -q 'master br-lan'; then
-			ip link set "$dev" master br-lan 2>/dev/null
-			ip link set "$dev" up 2>/dev/null
-		fi
+		# Tambah ke UCI port-list; network init nanti yg bikin bridge & masukkan port
 		CURRENT=$(uci -q get network.lanb.ports | tr '\n' ' ')
 		case " $CURRENT " in
 			*" $dev "*) ;;
 			*)
-				echo "Adding PCI/Wireless NIC $dev to br-lan"
+				echo "Adding PCI/Wireless NIC $dev to br-lan port list"
 				uci add_list network.lanb.ports="$dev"
 				;;
 		esac
@@ -48,4 +47,14 @@ for dev in $(ls /sys/class/net 2>/dev/null); do
 done
 
 uci commit network
+
+# DHCP lan harus server
+uci -q set dhcp.lan=dhcp
+uci -q set dhcp.lan.interface='lan'
+uci -q set dhcp.lan.start='100'
+uci -q set dhcp.lan.limit='150'
+uci -q set dhcp.lan.leasetime='12h'
+uci -q set dhcp.lan.ignore='0'
+uci commit dhcp
+
 exit 0
