@@ -1,20 +1,47 @@
 #!/bin/sh
-# Tambahkan port Ethernet fisik lain ke br-lan.
+# Tambah port Ethernet fisik ke br-lan. JANGAN network reload di sini:
+# uci-defaults jalan di first-boot; reload race dengan netifd.
+# Hotplug /etc/hotplug.d/net/00-lan-bridge handle NIC yang muncul belakangan.
 
-CURRENT=$(uci -q get network.lanb.ports | tr '\n' ' ')
+LOG=/tmp/lan-detect.log
+exec >>"$LOG" 2>&1
+echo "=== lan-detect $(date) ==="
+
+# Pastikan bridge tetap hidup tanpa port (driver belum load).
+uci -q set network.lanb.bridge_empty='1'
+uci -q set network.lan.force_link='1'
+uci -q set network.lan.ipaddr='192.168.1.1'
+uci -q set network.lan.netmask='255.255.255.0'
+
+CURRENT=$(uci -q get network.lanb.ports | tr '\n' ' ' | sed 's/^ *//;s/ *$//')
+echo "ports awal: [$CURRENT]"
 
 for p in $(ls /sys/class/net 2>/dev/null); do
 	[ -e "/sys/class/net/$p/device" ] || continue
 	case "$p" in
-		lo|br*|vir*|bat*|tun*|tap*|wg*|wwan*|rmnet*|p2p*|ifb*|teql*|gre*|erspan*|ip6tnl*|sit*|bond*|vlan*|eth0.*|veth*|docker*|lxc*) continue ;;
+		lo|br-*|virbr*|wlan*|phy*|bat*|tun*|tap*|wg*|wwan*|rmnet*|p2p*|ifb*|teql*|gre*|erspan*|ip6tnl*|sit*|bond*|vlan*|veth*|docker*|lxc*) continue ;;
+	esac
+	case "$p" in
+		*.*) continue ;;
 	esac
 	case " $CURRENT " in
-		*" $p "*) continue ;;  # sudah ada
+		*" $p "*) continue ;;
 	esac
+	echo "tambah port: $p"
 	uci add_list network.lanb.ports="$p"
 	CURRENT="$CURRENT $p"
 done
 
+echo "ports akhir: [$CURRENT]"
 uci commit network
-/etc/init.d/network reload
+
+# DHCP lan harus server, bukan ignore.
+uci -q set dhcp.lan=dhcp
+uci -q set dhcp.lan.interface='lan'
+uci -q set dhcp.lan.start='100'
+uci -q set dhcp.lan.limit='150'
+uci -q set dhcp.lan.leasetime='12h'
+uci -q set dhcp.lan.ignore='0'
+uci commit dhcp
+
 exit 0

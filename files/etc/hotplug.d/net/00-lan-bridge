@@ -1,0 +1,32 @@
+#!/bin/sh
+# NIC muncul belakangan (driver PCIe/USB lambat) -> masukkan ke br-lan.
+# Tanpa ini: eth0 hardcoded tapi interface sebenarnya eth1/enp* ->
+# bridge kosong, WiFi konek, 192.168.1.1 mati.
+
+[ "$ACTION" = "add" ] || exit 0
+[ -n "$INTERFACE" ] || exit 0
+
+case "$INTERFACE" in
+	lo|br-*|virbr*|wlan*|phy*|bat*|tun*|tap*|wg*|wwan*|rmnet*|p2p*|ifb*|teql*|gre*|erspan*|ip6tnl*|sit*|bond*|vlan*|veth*|docker*|lxc*) exit 0 ;;
+	*.*) exit 0 ;;
+esac
+
+[ -e "/sys/class/net/$INTERFACE/device" ] || exit 0
+
+# Sudah member bridge?
+if ip -o link show "$INTERFACE" 2>/dev/null | grep -q 'master br-lan'; then
+	exit 0
+fi
+
+# Tambah ke running bridge dulu (cepat), lalu persist ke UCI.
+ip link set "$INTERFACE" master br-lan 2>/dev/null
+ip link set "$INTERFACE" up 2>/dev/null
+
+CURRENT=$(uci -q get network.lanb.ports | tr '\n' ' ')
+case " $CURRENT " in
+	*" $INTERFACE "*) exit 0 ;;
+esac
+uci add_list network.lanb.ports="$INTERFACE"
+uci commit network
+logger -t lan-bridge "added $INTERFACE to br-lan"
+exit 0

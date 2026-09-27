@@ -1,20 +1,19 @@
 # Masta-GOHIM - default config jaringan.
 #
-# PENTING: br-lan WAJIB punya minimal satu `list ports`. Kalau bridge tanpa
-# port, netifd tidak pernah brings-up -> tidak ada DHCP -> PC dapat 169.254.x
-# persis seperti gejala di r5. eth0 dicantumkan sebagai jaring pengaman;
-# 50-lan-detect menambah port lain yang ditemukan dan tidak pernah menghapus
-# yang sudah ada.
+# PENTING: br-lan WAJIB `bridge_empty 1`. Tanpa itu, kalau eth0 belum
+# muncul saat netifd start (driver PCIe lambat), bridge GAGAL dibuat ->
+# dnsmasq tidak bind -> klien WiFi dapat 169.254.x -> 192.168.1.1 mati.
+# Gejala r6: SSID muncul & bisa konek, tapi LuCI tidak terjangkau.
 #
-# Tidak ada interface WAN. Di router, uplink lewat WiFi/5G. Kalau suatu hari
-# butuh WAN, tambahkan manual lewat LuCI.
+# eth0 dicantumkan sebagai jaring pengaman; 50-lan-detect + hotplug
+# menambah port lain. Tidak pernah hapus port yang sudah ada.
 #
-# Catatan: section ini memakai `type bridge` + `list ports` (bukan `ifname`)
-# supaya 11_network-migrate-bridges tidak mengubahnya.
+# Tidak ada interface WAN. Uplink lewat WiFi/5G. WAN tambah manual di LuCI.
 
 config device 'lanb'
 	option name 'br-lan'
 	option type 'bridge'
+	option bridge_empty '1'
 	list ports 'eth0'
 
 config interface 'loopback'
@@ -28,5 +27,5 @@ config interface 'lan'
 	option proto 'static'
 	option ipaddr '192.168.1.1'
 	option netmask '255.255.255.0'
-	option delegate '0'
-	option ip6assign '60d'
+	option ip6assign '60'
+	option force_link '1'
