@@ -1,0 +1,8 @@
+#!/bin/sh
+# Force RM520N-GL modem detection and mhi driver loading
+mkdir -p /etc/config
+uci -q set network.wan_modem=interface
+uci -q set network.wan_modem.proto='qmi'
+uci -q set network.wan_modem.device='/dev/cdc-wdm0'
+uci -q set network.wan_modem.apn='internet'
+uci commit network

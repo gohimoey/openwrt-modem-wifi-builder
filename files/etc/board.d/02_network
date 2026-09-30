@@ -1,47 +1,5 @@
 #!/bin/sh
-# Masta-GOHIM - Override default eth0/eth1 lan/wan mapping.
-# Karena di x86 modern nama interface adalah enp*/eno*/ens* (bukan eth0/eth1),
-# 99-default_network (eth0=lan, eth1=wan) bikin br-lan kosong -> LAN mati.
-# Deteksi berdasar path sysfs: USB -> WAN, PCI/Wireless -> LAN bridge.
-. /lib/functions/system.sh
 . /lib/functions/uci-defaults.sh
-
 board_config_update
-json_is_a network object && exit 0
-
-LAN_DEVS=""
-WAN_DEV=""
-
-for dev in $(ls /sys/class/net 2>/dev/null); do
-	case "$dev" in
-		lo|br-*|virbr*|tun*|tap*|wg*|wwan*|rmnet*|p2p*|ifb*|teql*|gre*|erspan*|ip6tnl*|sit*|bond*|vlan*|veth*|docker*|lxc*) continue ;;
-	esac
-	[ -e "/sys/class/net/$dev/device" ] || continue
-	DEVPATH=$(readlink -f "/sys/class/net/$dev/device" 2>/dev/null)
-	if echo "$DEVPATH" | grep -q '/usb'; then
-		# USB NIC: assign WAN (first wins).
-		[ -z "$WAN_DEV" ] && WAN_DEV="$dev"
-	elif echo "$DEVPATH" | grep -q '/pci' || [ -d "/sys/class/net/$dev/wireless" ]; then
-		# Onboard/PCIe NIC or a wireless phy -> LAN bridge.
-		LAN_DEVS="${LAN_DEVS:+$LAN_DEVS }$dev"
-	fi
-done
-
-# Build br-lan bridge from detected LAN ports + force a usable default.
-ucidef_set_device_bridge 'br-lan' $LAN_DEVS
-ucidef_set_interface_lan 'br-lan'
-
-if [ -n "$WAN_DEV" ]; then
-	ucidef_set_interface_wan "$WAN_DEV"
-else
-	# No USB NIC found: leave wan as dhcp on whatever shows up first
-	# (keeps WAN functional if the box has dual PCI NICs, eth1-style).
-	ucidef_set_interface_wan
-fi
-
-# DHCP server on lan so clients get addresses once the bridge is up.
-ucidef_set_dhcp_lan 'server' '100' '150' '12h'
-ucidef_set_dhcp_lan_ignore '0'
-
+ucidef_set_interfaces_lan_wan "$(ip address | grep ^[0-9] | awk -F: '{print $2}' | grep -vE 'eth0|lo' | tr '\n' ' ')" "eth0"
 board_config_flush
-exit 0

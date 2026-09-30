@@ -1,6 +1,4 @@
 #!/bin/sh
-export PATH="/usr/sbin:/usr/bin:/sbin:/bin"
-
 #
 # Optimized OpenWrt WiFi Configuration Script
 #
@@ -52,19 +50,19 @@ while [ $# -gt 0 ]; do
     esac
     shift
 done
-# DISABLED: 
-# DISABLED: # -------------------------------------------------------------
-# DISABLED: # 2. 状态标记检查与防并发锁
-# DISABLED: # -------------------------------------------------------------
-# DISABLED: # 既未强制重新配置，又无自定义参数，且已配置过时直接跳过
-# DISABLED: # SKIP: base_config status check removed
-# DISABLED:     if [ "$(uci -q get base_config.@status[0].wifi 2>/dev/null)" = "1" ]; then
-# DISABLED:         :
-# DISABLED:         :
-# DISABLED:     fi
-# DISABLED: fi
-# DISABLED: 
-# DISABLED: # 文件锁（有任务参数时排队等待，否则遇锁直接退出）
+
+# -------------------------------------------------------------
+# 2. 状态标记检查与防并发锁
+# -------------------------------------------------------------
+# 既未强制重新配置，又无自定义参数，且已配置过时直接跳过
+if [ $FORCE -eq 0 ] && [ -z "$CUSTOM_SSID" ] && [ $HAS_PASSWD -eq 0 ]; then
+    if [ "$(uci -q get base_config.@status[0].wifi 2>/dev/null)" = "1" ]; then
+        log_info "WiFi 已配置完成，无需重复执行。"
+        exit 0
+    fi
+fi
+
+# 文件锁（有任务参数时排队等待，否则遇锁直接退出）
 WAIT_LOCK=0
 [ $FORCE -eq 1 ] || [ -n "$CUSTOM_SSID" ] || [ $HAS_PASSWD -eq 1 ] && WAIT_LOCK=1
 
@@ -200,7 +198,7 @@ for radio in $RADIOS; do
 
     # 配置 radio 参数
     uci -q del wireless.${radio}.disabled
-    uci -q set wireless.${radio}.country='ID'
+    uci -q set wireless.${radio}.country='CN'
     [ "$band" = "5g" ] && case "$DISTRIB_TARGET" in *ipq60xx*) uci -q set wireless.${radio}.htmode='HE80' ;; esac
 
     # 配置 iface 参数
