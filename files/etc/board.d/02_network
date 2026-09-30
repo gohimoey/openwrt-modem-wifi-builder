@@ -1,5 +1,25 @@
 #!/bin/sh
-. /lib/functions/uci-defaults.sh
+# Auto-detect PCI/WiFi NICs -> LAN, USB NIC -> WAN (dynamic, x86 board.json-free)
+[ -f /lib/functions/uci-defaults.sh ] && . /lib/functions/uci-defaults.sh
 board_config_update
-ucidef_set_interfaces_lan_wan "$(ip address | grep ^[0-9] | awk -F: '{print $2}' | grep -vE 'eth0|lo' | tr '\n' ' ')" "eth0"
+
+lan=""
+wan=""
+for dev in $(ls /sys/class/net 2>/dev/null); do
+    [ -e "/sys/class/net/$dev/device" ] || continue
+    case "$dev" in lo|br-*|virbr*|tun*|tap*|wg*|wwan*|rmnet*) continue;; esac
+    if [ -d "/sys/class/net/$dev/wireless" ]; then
+        lan="$lan $dev"
+    elif echo "$dev" | grep -qE '^(enp|eth)'; then
+        # PCIe or onboard Ethernet -> LAN (not WAN)
+        lan="$lan $dev"
+    elif [ -d "/sys/class/net/$dev/device" ] && readlink -f "/sys/class/net/$dev/device" | grep -q /usb; then
+        # USB NIC -> WAN
+        [ -z "$wan" ] && wan="$dev"
+    fi
+done
+
+lan="${lan# }"; lan="${lan% }"
+[ -n "$lan" ] && ucidef_set_interface_lan "$lan"
+[ -n "$wan" ] && ucidef_set_interface_wan "$wan"
 board_config_flush
